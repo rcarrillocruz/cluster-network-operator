@@ -1,0 +1,77 @@
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    app: sflow-collector
+  name: sflow-collector
+  namespace: openshift-ovn-kubernetes
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: sflow-collector
+  strategy: {}
+  template:
+    metadata:
+      labels:
+        app: sflow-collector
+    spec:
+      serviceAccountName: ovn-kubernetes-node
+      containers:
+      - command: ["/bin/sh", "-c"]
+        args: ["/goflow -kafka=false -logfmt=json 2>&1 | tee /sflow-data/sflow-raw"]
+        image: quay.io/rcarrillocruz/goflow:latest
+        name: sflow-collector
+        resources: {}
+      dnsPolicy: ClusterFirst
+      restartPolicy: Always
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  labels:
+    app: sflow-collector
+  name: sflow-collector
+  namespace: openshift-ovn-kubernetes
+spec:
+  ports:
+  - port: 6343
+    protocol: UDP
+    targetPort: 6343
+  selector:
+    app: sflow-collector
+  type: ClusterIP
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: sflow-collector-metrics
+  namespace: openshift-ovn-kubernetes
+spec:
+  ports:
+  - name: metrics
+    port: 8080
+    protocol: TCP
+    targetPort: 8080
+  selector:
+    app: sflow-collector
+  type: ClusterIP
+
+---
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: sflow-collector-metrics-monitor
+  namespace: openshift-ovn-kubernetes
+spec:
+  namespaceSelector:
+    matchNames:
+    - openshift-ovn-kubernetes
+  selector:
+    matchLabels:
+      app: sflow-collector-metrics
+  endpoints:
+  - port: metrics

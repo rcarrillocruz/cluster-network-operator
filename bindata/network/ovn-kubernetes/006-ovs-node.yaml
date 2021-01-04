@@ -82,6 +82,8 @@ spec:
             trap quit SIGTERM
             # Don't need to worry about restoring flows; this can only change if we've rebooted
             tail --pid=$BASHPID -F /host/var/log/openvswitch/ovs-vswitchd.log /host/var/log/openvswitch/ovsdb-server.log &
+            nf_svc_ip=$(kubectl get svc -n openshift-ovn-kubernetes sflow-collector -o jsonpath='{.spec.clusterIP}')
+            ovs-vsctl -- --id=@sflow create sflow agent=ovn-k8s-mp0 target="\"${nf_svc_ip}:6343\"" header=128 sampling=64 polling=10 -- set bridge br-int sflow=@sflow
             wait
           else
             echo "$(date -Iseconds) - starting ovs-daemons"
@@ -102,6 +104,8 @@ spec:
 
             tail -F --pid=$(cat /var/run/openvswitch/ovs-vswitchd.pid) /var/log/openvswitch/ovs-vswitchd.log &
             tail -F --pid=$(cat /var/run/openvswitch/ovsdb-server.pid) /var/log/openvswitch/ovsdb-server.log &
+            nf_svc_ip=$(kubectl get svc -n openshift-ovn-kubernetes sflow-collector -o jsonpath='{.spec.clusterIP}')
+            ovs-vsctl -- --id=@sflow create sflow agent=ovn-k8s-mp0 target="\"{nf_svc_ip}:6343\"" header=128 sampling=64 polling=10 -- set bridge br-int sflow=@sflow
             wait
           fi
         env:
